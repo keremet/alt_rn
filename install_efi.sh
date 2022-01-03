@@ -1,15 +1,16 @@
 #!/bin/bash
 set -e
 
-if [ $# != 1 ] 
+if [ $# != 2 ] 
 then
-	echo "Help: $0 <device to install>"
-	echo "For example: $0 /dev/sda"
+	echo "Help: $0 <device to install> <new host name>"
+	echo "For example: $0 /dev/sda rn1076"
 	exit 1
 fi
 
-export DEVICE=$1
-export MOUNT_DIR=/mnt
+DEVICE=$1
+NEW_HOST_NAME=$2
+MOUNT_DIR=/mnt
 
 STEP_COLOR='\033[1;32m'
 WARN_COLOR='\033[1;31m'
@@ -76,16 +77,25 @@ sed -i '/\/boot\/efi/d' $MOUNT_DIR/etc/fstab
 UUID=`blkid --match-tag UUID -o value "$DEVICE"3`
 printf "UUID=$UUID\tnone\tswap\tsw\t0\t0" >> $MOUNT_DIR/etc/fstab
 
-echo -e "${STEP_COLOR}*** Install GRUB ***${NO_COLOR}"
+echo -e "${STEP_COLOR}*** Install GRUB, change host name ***${NO_COLOR}"
 mkdir -p $MOUNT_DIR/boot/efi
 mount "$DEVICE"1 $MOUNT_DIR/boot/efi
 mount "$DEVICE"4 $MOUNT_DIR/var
+sed -i "s/:rm=rn1084:/:rm=$NEW_HOST_NAME:/g" $MOUNT_DIR/etc/printcap
+sed -i "s/^HOSTNAME=rn1084$/HOSTNAME=$NEW_HOST_NAME/g" $MOUNT_DIR/etc/sysconfig/network
+sed -i "s/rn1084 rn1084$/$NEW_HOST_NAME/g" $MOUNT_DIR/etc/hosts
+sed -i "s/rn1084 rn1084$/$NEW_HOST_NAME/g" $MOUNT_DIR/var/resolv/etc/hosts
+echo "$NEW_HOST_NAME" > $MOUNT_DIR/etc/hostname
+rm $MOUNT_DIR/etc/openssh/ssh_host_*
+rm $MOUNT_DIR/var/spool/cups/c* $MOUNT_DIR/var/spool/cups/d* 
+rm $MOUNT_DIR/var/log/journal/a590e2c236ea43c7ce0bc9db61c7035f/*
 grub-install --root-directory=$MOUNT_DIR --bootloader-id=altlinux $DEVICE
 
 mount --bind /dev "$MOUNT_DIR"/dev
 mount --bind /sys "$MOUNT_DIR"/sys
 mount --bind /proc "$MOUNT_DIR"/proc
 chroot "$MOUNT_DIR" update-grub
+chroot "$MOUNT_DIR" mklocatedb
 umount "$MOUNT_DIR"/dev
 umount "$MOUNT_DIR"/sys
 umount "$MOUNT_DIR"/proc
