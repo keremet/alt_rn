@@ -72,11 +72,12 @@ mount "$DEVICE"2 $MOUNT_DIR
 
 ##Настроить подключение свопа при загрузке
 sed -i '/swap/d' $MOUNT_DIR/etc/fstab
+sed -i '/\/boot\/efi/d' $MOUNT_DIR/etc/fstab
 UUID=`blkid --match-tag UUID -o value "$DEVICE"3`
 printf "UUID=$UUID\tnone\tswap\tsw\t0\t0" >> $MOUNT_DIR/etc/fstab
 
 echo -e "${STEP_COLOR}*** Install GRUB ***${NO_COLOR}"
-mkdir $MOUNT_DIR/boot/efi
+mkdir -p $MOUNT_DIR/boot/efi
 mount "$DEVICE"1 $MOUNT_DIR/boot/efi
 mount "$DEVICE"4 $MOUNT_DIR/var
 grub-install --root-directory=$MOUNT_DIR --bootloader-id=altlinux $DEVICE
