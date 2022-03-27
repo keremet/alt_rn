@@ -21,7 +21,7 @@ function fill_part {
 	set +e
 	umount "$DEVICE$2" 2>/dev/null
 	set -e
-	unxz < $3.img.xz | dd of="$DEVICE$2" bs=1M status=progress conv=fsync
+	unxz -T0 < $3.img.xz | dd of="$DEVICE$2" bs=1M status=progress conv=fsync
 	e2fsck -f "$DEVICE$2"
 	resize2fs "$DEVICE$2"
 	e2fsck "$DEVICE$2"
@@ -81,6 +81,8 @@ echo -e "${STEP_COLOR}*** Install GRUB, change host name ***${NO_COLOR}"
 mkdir -p $MOUNT_DIR/boot/efi
 mount "$DEVICE"1 $MOUNT_DIR/boot/efi
 mount "$DEVICE"4 $MOUNT_DIR/var
+mount "$DEVICE"5 $MOUNT_DIR/home
+rm -r $MOUNT_DIR/home/user/.local/share/medit-1 $MOUNT_DIR/home/user/.cache/medit-1
 sed -i "s/:rm=rn1084:/:rm=$NEW_HOST_NAME:/g" $MOUNT_DIR/etc/printcap
 sed -i "s/^HOSTNAME=rn1084$/HOSTNAME=$NEW_HOST_NAME/g" $MOUNT_DIR/etc/sysconfig/network
 sed -i "s/rn1084 rn1084$/$NEW_HOST_NAME/g" $MOUNT_DIR/etc/hosts
@@ -89,24 +91,32 @@ echo "$NEW_HOST_NAME" > $MOUNT_DIR/etc/hostname
 rm $MOUNT_DIR/etc/openssh/ssh_host_*
 rm $MOUNT_DIR/var/spool/cups/c* $MOUNT_DIR/var/spool/cups/d* 
 rm $MOUNT_DIR/var/log/journal/a590e2c236ea43c7ce0bc9db61c7035f/*
-grub-install --root-directory=$MOUNT_DIR --bootloader-id=altlinux $DEVICE
+#For ProBook 6470b https://rockhopper.dk/linux/hardware/uefi-booting-arch-linux-on-a-hp-probook-6360b/
+#grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=altlinux --recheck
+
 
 mount --bind /dev "$MOUNT_DIR"/dev
 mount --bind /sys "$MOUNT_DIR"/sys
 mount --bind /proc "$MOUNT_DIR"/proc
+rm -r $MOUNT_DIR/etc/grub.d/20_linux_xen $MOUNT_DIR/etc/grub.d/3* $MOUNT_DIR/etc/grub.d/40*
+sed -i 's/linux\t\${rel_dirname}\/${basename} root=\${linux_root_device_thisversion} ro \${args}/linuxefi\t\${rel_dirname}\/\${basename} root=\${linux_root_device_thisversion} ro \${args}/g' $MOUNT_DIR/etc/grub.d/10_linux
+sed -i 's/initrd\t\$(echo \$initrd_path)/initrdefi\t\$(echo \$initrd_path)/g' $MOUNT_DIR/etc/grub.d/10_linux
+chroot "$MOUNT_DIR" grub-install --root-directory=/ --no-nvram $DEVICE
 chroot "$MOUNT_DIR" update-grub
 chroot "$MOUNT_DIR" mklocatedb
+mkdir -p $MOUNT_DIR/boot/efi/EFI/BOOT
+cp $MOUNT_DIR/boot/efi/EFI/altlinux/grubx64.efi $MOUNT_DIR/boot/efi/EFI/BOOT/BOOTX64.EFI
+cp $MOUNT_DIR/boot/efi/EFI/altlinux/grub.cfg    $MOUNT_DIR/boot/efi/EFI/BOOT/
 umount "$MOUNT_DIR"/dev
 umount "$MOUNT_DIR"/sys
 umount "$MOUNT_DIR"/proc
 
+umount $MOUNT_DIR/home
 umount $MOUNT_DIR/var
 umount $MOUNT_DIR/boot/efi
 umount $MOUNT_DIR
 
 
 echo -e "${STEP_COLOR}*** ALT-RN has been successfully installed ***${NO_COLOR}"
-
-read -p "Do you want to reboot now(y/n)? " -n 1 -r
-echo
-[[ $REPLY =~ ^[Yy]$ ]] && reboot
+echo -e "Press ${STEP_COLOR}ALT+CTRL+DEL${NO_COLOR} to reboot or ${STEP_COLOR}Enter${NO_COLOR} to open a shell prompt"
+read
