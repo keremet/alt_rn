@@ -75,7 +75,7 @@ mount "$DEVICE"2 $MOUNT_DIR
 sed -i '/swap/d' $MOUNT_DIR/etc/fstab
 sed -i '/\/boot\/efi/d' $MOUNT_DIR/etc/fstab
 UUID=`blkid --match-tag UUID -o value "$DEVICE"3`
-printf "UUID=$UUID\tnone\tswap\tsw\t0\t0" >> $MOUNT_DIR/etc/fstab
+printf "UUID=$UUID\tnone\tswap\tsw\t0\t0\n" >> $MOUNT_DIR/etc/fstab
 
 echo -e "${STEP_COLOR}*** Install GRUB, change host name ***${NO_COLOR}"
 mkdir -p $MOUNT_DIR/boot/efi
